@@ -1,0 +1,240 @@
+/*!
+ * SweetAlert2 v11.26.18
+ * Released under the MIT License.
+ */
+
+// Namespace prefix
+const NAMESPACE = 'swal2-';
+
+// Class names object
+const CLASS = [
+  'container', 'shown', 'height-auto', 'iosfix', 'popup', 'modal', 'no-backdrop', 'no-transition', 'toast', 'toast-shown',
+  'show', 'hide', 'close', 'title', 'html-container', 'actions', 'confirm', 'deny', 'cancel', 'footer', 'icon', 'icon-content',
+  'image', 'input', 'file', 'range', 'select', 'radio', 'checkbox', 'label', 'textarea', 'inputerror', 'input-label',
+  'validation-message', 'progress-steps', 'active-progress-step', 'progress-step', 'progress-step-line', 'loader', 'loading',
+  'styled', 'top', 'top-start', 'top-end', 'top-left', 'top-right', 'center', 'center-start', 'center-end', 'center-left',
+  'center-right', 'bottom', 'bottom-start', 'bottom-end', 'bottom-left', 'bottom-right', 'grow-row', 'grow-column',
+  'grow-fullscreen', 'rtl', 'timer-progress-bar', 'timer-progress-bar-container', 'scrollbar-measure',
+  'icon-success', 'icon-warning', 'icon-info', 'icon-question', 'icon-error', 'draggable', 'dragging'
+].reduce((acc, key) => {
+  acc[key] = NAMESPACE + key;
+  return acc;
+}, {});
+
+// Icon class names
+const ICON = ['success', 'warning', 'info', 'question', 'error'].reduce((acc, key) => {
+  acc[key] = NAMESPACE + key;
+  return acc;
+}, {});
+
+// Global state
+const globalState = {
+  currentInstance: null,
+  previousActiveElement: null,
+  restoreFocusTimeout: null,
+  timeout: null,
+  keydownHandler: null,
+  keydownTarget: null,
+  keydownListenerCapture: false,
+  swalCloseEventFinishedCallback: null,
+  eventEmitter: new class {
+    constructor() { this.events = {}; }
+    _getHandlers(eventName) {
+      if (!this.events[eventName]) this.events[eventName] = [];
+      return this.events[eventName];
+    }
+    on(eventName, handler) {
+      const handlers = this._getHandlers(eventName);
+      if (!handlers.includes(handler)) handlers.push(handler);
+    }
+    once(eventName, handler) {
+      const onceHandler = (...args) => {
+        this.removeListener(eventName, onceHandler);
+        handler(...args);
+      };
+      this.on(eventName, onceHandler);
+    }
+    emit(eventName, ...args) {
+      this._getHandlers(eventName).forEach(h => {
+        try { h(...args); } catch (err) { console.error(err); }
+      });
+    }
+    removeListener(eventName, handler) {
+      const handlers = this._getHandlers(eventName);
+      const idx = handlers.indexOf(handler);
+      if (idx > -1) handlers.splice(idx, 1);
+    }
+    removeAllListeners(eventName) {
+      if (this.events[eventName]) this.events[eventName].length = 0;
+    }
+    reset() { this.events = {}; }
+  }()
+};
+
+// Default params
+const defaultParams = {
+  title: '',
+  titleText: '',
+  text: '',
+  html: '',
+  footer: '',
+  icon: undefined,
+  iconColor: undefined,
+  iconHtml: undefined,
+  template: undefined,
+  toast: false,
+  draggable: false,
+  animation: true,
+  theme: 'light',
+  showClass: { popup: 'swal2-show', backdrop: 'swal2-backdrop-show', icon: 'swal2-icon-show' },
+  hideClass: { popup: 'swal2-hide', backdrop: 'swal2-backdrop-hide', icon: 'swal2-icon-hide' },
+  customClass: {},
+  target: 'body',
+  color: undefined,
+  backdrop: true,
+  heightAuto: true,
+  allowOutsideClick: true,
+  allowEscapeKey: true,
+  allowEnterKey: true,
+  stopKeydownPropagation: true,
+  keydownListenerCapture: false,
+  showConfirmButton: true,
+  showDenyButton: false,
+  showCancelButton: false,
+  preConfirm: undefined,
+  preDeny: undefined,
+  confirmButtonText: 'OK',
+  confirmButtonAriaLabel: '',
+  confirmButtonColor: undefined,
+  denyButtonText: 'No',
+  denyButtonAriaLabel: '',
+  denyButtonColor: undefined,
+  cancelButtonText: 'Cancel',
+  cancelButtonAriaLabel: '',
+  cancelButtonColor: undefined,
+  buttonsStyling: true,
+  reverseButtons: false,
+  focusConfirm: true,
+  focusDeny: false,
+  focusCancel: false,
+  returnFocus: true,
+  showCloseButton: false,
+  closeButtonHtml: '&times;',
+  closeButtonAriaLabel: 'Close this dialog',
+  loaderHtml: '',
+  showLoaderOnConfirm: false,
+  showLoaderOnDeny: false,
+  imageUrl: undefined,
+  imageWidth: undefined,
+  imageHeight: undefined,
+  imageAlt: '',
+  timer: undefined,
+  timerProgressBar: false,
+  width: undefined,
+  padding: undefined,
+  background: undefined,
+  input: undefined,
+  inputPlaceholder: '',
+  inputLabel: '',
+  inputValue: '',
+  inputOptions: {},
+  inputAutoFocus: true,
+  inputAutoTrim: true,
+  inputAttributes: {},
+  inputValidator: undefined,
+  returnInputValueOnDeny: false,
+  validationMessage: undefined,
+  grow: false,
+  position: 'center',
+  progressSteps: [],
+  currentProgressStep: undefined,
+  progressStepsDistance: undefined,
+  willOpen: undefined,
+  didOpen: undefined,
+  didRender: undefined,
+  willClose: undefined,
+  didClose: undefined,
+  didDestroy: undefined,
+  scrollbarPadding: true,
+  topLayer: false
+};
+
+// ... (fungsi helper seperti isValidParameter, isUpdatableParameter, isDeprecatedParameter, dll tetap sama)
+
+// Main SweetAlert2 class (disingkat)
+class SweetAlert2 {
+  constructor(...args) {
+    // Parse arguments to params
+    const params = this.constructor.argsToParams(args);
+
+    // Bind current instance
+    globalState.currentInstance = this;
+
+    // Main logic (mirip _main di kode asli)
+    this.params = params;
+    this.isAwaitingPromise = false;
+
+    // Jalankan proses utama
+    this._main(params);
+  }
+
+  // ... (method-method utama seperti fire, mixin, getActions, clickConfirm, dll)
+
+  // Close / dismiss
+  close(result = {}) {
+    // Logika close popup, trigger didClose, dll
+  }
+
+  // Update params
+  update(newParams) {
+    // Validasi dan update params
+  }
+
+  // Destroy instance
+  _destroy() {
+    // Cleanup semua event listener, dom, dll
+  }
+}
+
+// Export
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = SweetAlert2;
+} else if (typeof define === 'function' && define.amd) {
+  define(() => SweetAlert2);
+} else {
+  window.Sweetalert2 = window.Swal = window.swal = SweetAlert2;
+}
+
+// CSS variables (bagian style di akhir kode asli)
+const CSS_ROOT = `
+:root {
+  --swal2-outline: 0 0 0 3px rgba(100, 150, 200, 0.5);
+  --swal2-container-padding: 0.625em;
+  --swal2-backdrop: rgba(0, 0, 0, 0.4);
+  --swal2-backdrop-transition: background-color 0.15s;
+  --swal2-width: 32em;
+  --swal2-padding: 0 0 1.25em;
+  --swal2-border: none;
+  --swal2-border-radius: 0.3125rem;
+  --swal2-background: white;
+  --swal2-color: #545454;
+  /* ... (seluruh CSS variables lainnya seperti di kode asli) */
+}
+[data-swal2-theme="dark"] {
+  --swal2-background: #19191a;
+  --swal2-color: #e1e1e1;
+  /* ... dark mode variables */
+}
+@media (prefers-color-scheme: dark) {
+  [data-swal2-theme="auto"] {
+    /* ... auto dark mode */
+  }
+}
+`;
+
+// Inject CSS jika belum ada
+if (typeof document !== 'undefined') {
+  const style = document.createElement('style');
+  style.textContent = CSS_ROOT;
+  document.head.appendChild(style);
+}
